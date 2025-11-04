@@ -1,0 +1,82 @@
+#!/usr/bin/env php
+<?php
+/**
+ * TRAI SMS Header CLI Inspector
+ *
+ * Usage:
+ *   vendor/bin/trai-sms-header <HEADER> [--file=/path/to/sender-list.json] [--json]
+ *
+ * Examples:
+ *   vendor/bin/trai-sms-header VM-ABCDEF-S
+ *   vendor/bin/trai-sms-header VM-ABCDEF-S --file=/tmp/custom-senders.json
+ *   vendor/bin/trai-sms-header VM-ABCDEF-S --json
+ */
+
+require __DIR__ . '/../vendor/autoload.php';
+
+use Cyberwani\TRAI_SMS_Header\TRAI_SMS_Header;
+
+// --------------------
+// Parse CLI arguments
+// --------------------
+$args = $argv;
+array_shift($args); // remove script name
+
+if (empty($args)) {
+    echo "Usage: trai-sms-header <HEADER> [--file=/path/to/sender-list.json] [--json]\n";
+    echo "Example: trai-sms-header VM-ABCDEF-S --json\n";
+    exit(1);
+}
+
+$header = null;
+$jsonOutput = false;
+$customFile = null;
+
+foreach ($args as $arg) {
+    if (strpos($arg, '--file=') === 0) {
+        $customFile = substr($arg, 7);
+    } elseif ($arg === '--json') {
+        $jsonOutput = true;
+    } elseif (!$header) {
+        $header = $arg;
+    }
+}
+
+if (!$header) {
+    echo "❌ Error: Header not provided.\n";
+    echo "Usage: trai-sms-header <HEADER>\n";
+    exit(1);
+}
+
+// --------------------
+// Initialize library
+// --------------------
+$trai = new TRAI_SMS_Header($customFile);
+$result = $trai->inspect($header);
+
+// --------------------
+// Output result
+// --------------------
+if ($jsonOutput) {
+    echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
+    exit(0);
+}
+
+echo "🔍 TRAI SMS Header Inspection\n";
+echo "──────────────────────────────\n";
+
+if (isset($result['error'])) {
+    echo "❌ Error: {$result['error']}\n";
+    exit(1);
+}
+
+echo "Header:       {$header}\n";
+echo "Prefix:       {$result['prefix']}\n";
+echo "Operator:     {$result['operator']} ({$result['operator_code']})\n";
+echo "Circle:       {$result['circle']} ({$result['circle_code']})\n";
+echo "Sender ID:    {$result['sender_id']}\n";
+echo "Sender Name:  {$result['sender_name']}\n";
+echo "Message Type: {$result['message_type']}\n";
+echo "Suffix:       " . ($result['suffix'] ?? 'None') . "\n";
+echo "Valid:        " . ($result['valid'] ? 'Yes' : 'No') . "\n";
+echo "──────────────────────────────\n";

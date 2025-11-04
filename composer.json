@@ -1,0 +1,23 @@
+{
+	"name": "cyberwani/trai-sms-header",
+	"description": "A PHP library for inspecting TRAI-compliant SMS headers (operator, circle, and message type mapping) with DLT sender lookup.",
+	"type": "library",
+	"license": "MIT",
+	"authors": [
+		{
+			"name": "Cyberwani",
+			"homepage": "https://github.com/cyberwani"
+		}
+	],
+	"autoload": {
+		"psr-4": {
+			"Cyberwani\\\\TRAI_SMS_Header\\\\": "src/"
+		},
+		"files": [
+			"src/class-trai-sms-header.php"
+		]
+	},
+	"require": {
+		"php": ">=7.4"
+	}
+}
