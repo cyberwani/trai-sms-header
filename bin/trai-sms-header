@@ -5,6 +5,7 @@
  *
  * Usage:
  *   vendor/bin/trai-sms-header <HEADER> [--file=/path/to/sender-list.json] [--json]
+ *   vendor/bin/trai-sms-header build-json <input.xlsx|input.csv> [--output=/path/to/sender-list.json]
  *
  * Examples:
  *   vendor/bin/trai-sms-header VM-ABCDEF-S
@@ -16,18 +17,93 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use Cyberwani\TRAI_SMS_Header\TRAI_SMS_Header;
 
-// --------------------
-// Parse CLI arguments
-// --------------------
+// Detect if user wants to run the build-json command
 $args = $argv;
 array_shift($args); // remove script name
 
 if (empty($args)) {
-    echo "Usage: trai-sms-header <HEADER> [--file=/path/to/sender-list.json] [--json]\n";
-    echo "Example: trai-sms-header VM-ABCDEF-S --json\n";
+    echo "Usage:\n";
+    echo "  trai-sms-header <HEADER> [--file=/path/to/sender-list.json] [--json]\n";
+    echo "  trai-sms-header build-json <input.xlsx|input.csv> [--output=/path/to/sender-list.json]\n";
     exit(1);
 }
 
+// Handle subcommands
+$command = $args[0];
+
+if ($command === 'build-json') {
+    // ---------------------------------------------
+    // SUBCOMMAND: build-json (convert Excel/CSV → JSON)
+    // ---------------------------------------------
+    if (empty($args[1])) {
+        echo "❌ Please provide the path to TRAI sender list file (.xlsx or .csv)\n";
+        exit(1);
+    }
+
+    $inputFile = $args[1];
+    $outputFile = 'src/Data/sender-list.json'; // default
+    foreach ($args as $arg) {
+        if (strpos($arg, '--output=') === 0) {
+            $outputFile = substr($arg, 9);
+        }
+    }
+
+    // Detect file type
+    $ext = strtolower(pathinfo($inputFile, PATHINFO_EXTENSION));
+    $data = [];
+
+    if (!file_exists($inputFile)) {
+        echo "❌ File not found: $inputFile\n";
+        exit(1);
+    }
+
+    echo "🔄 Reading $inputFile ...\n";
+
+    if ($ext === 'xlsx') {
+        // Use PhpSpreadsheet
+        $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader('Xlsx');
+        $spreadsheet = $reader->load($inputFile);
+        $sheet = $spreadsheet->getActiveSheet();
+        $highestRow = $sheet->getHighestRow();
+
+        for ($row = 2; $row <= $highestRow; $row++) {
+            $senderId = strtoupper(trim((string)$sheet->getCellByColumnAndRow(1, $row)->getValue()));
+            $senderName = trim((string)$sheet->getCellByColumnAndRow(2, $row)->getValue());
+            if ($senderId !== '') {
+                $data[$senderId] = $senderName;
+            }
+        }
+    } elseif ($ext === 'csv') {
+        if (($handle = fopen($inputFile, 'r')) !== false) {
+            fgetcsv($handle); // skip header
+            while (($row = fgetcsv($handle)) !== false) {
+                $senderId = strtoupper(trim($row[0] ?? ''));
+                $senderName = trim($row[1] ?? '');
+                if ($senderId !== '') {
+                    $data[$senderId] = $senderName;
+                }
+            }
+            fclose($handle);
+        }
+    } else {
+        echo "❌ Unsupported file format. Please use .xlsx or .csv\n";
+        exit(1);
+    }
+
+    if (empty($data)) {
+        echo "⚠️ No sender records found in the input file.\n";
+        exit(1);
+    }
+
+    file_put_contents($outputFile, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+    echo "✅ Exported " . count($data) . " sender records to $outputFile\n";
+    exit(0);
+}
+
+// ---------------------------------------------
+// DEFAULT COMMAND: inspect header
+// ---------------------------------------------
 $header = null;
 $jsonOutput = false;
 $customFile = null;
@@ -37,7 +113,7 @@ foreach ($args as $arg) {
         $customFile = substr($arg, 7);
     } elseif ($arg === '--json') {
         $jsonOutput = true;
-    } elseif (!$header) {
+    } elseif (!$header && $arg !== 'build-json') {
         $header = $arg;
     }
 }
@@ -62,6 +138,7 @@ if ($jsonOutput) {
     exit(0);
 }
 
+// Human-readable output
 echo "🔍 TRAI SMS Header Inspection\n";
 echo "──────────────────────────────\n";
 
