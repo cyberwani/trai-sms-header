@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented here.
 
+## [1.0.3] - 2025-11-04
+### Changed
+- Added documentation and usage examples.
+
 ## [1.0.2] - 2025-11-04
 ### Changed
 - Updated `sender-list.json` with latest TRAI DLT sender mappings and entity names.
